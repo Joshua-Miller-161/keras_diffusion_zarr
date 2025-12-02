@@ -1,5 +1,5 @@
 # Array / IO stack
-zarr=2.18.2
+zarr==2.18.2
 xarray
 netCDF4
 h5py
