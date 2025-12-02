@@ -1,4 +1,5 @@
 import sys
+
 sys.dont_write_bytecode = True
 import os
 import numpy as np
@@ -21,8 +22,13 @@ import pandas as pd
 
 logger = logging.getLogger()
 
-from dataset import DownscalingDataset
-from transforms import build_input_transform, build_target_transform, save_transform, load_transform
+from .dataset import DownscalingDataset
+from .transforms import (
+    build_input_transform,
+    build_target_transform,
+    save_transform,
+    load_transform,
+)
 #====================================================================
 # ''' Handles printing and logging from multiple GPUs (from ChatGPT lol)'''
 
@@ -41,16 +47,15 @@ def dataset_path(dataset: str, base_dir: str = None) -> Path:
 def datafile_path(dataset: str, filename: str, base_dir: str = None) -> Path:
     return dataset_path(dataset, base_dir=base_dir) / filename
 #====================================================================
-# def dataset_config_path(dataset: str, base_dir: str = None) -> Path:
-
-#     print(" >> >> INSIDE dataset_config_path", dataset_path(dataset, base_dir=base_dir) / "ds-config.yml")
-#     logger.info(f" >> >> INSIDE dataset_config_path {dataset_path(dataset, base_dir=base_dir)} / ds-config.yml")
-
-#     return dataset_path(dataset, base_dir=base_dir) / "ds-config.yml"
+def dataset_config_path(dataset: str, base_dir: str = None) -> Path:
+    config_path = dataset_path(dataset, base_dir=base_dir) / "ds-config.yml"
+    logger.info(" >> >> dataset_config_path resolved to %s", str(config_path))
+    return config_path
 #====================================================================
-# def dataset_config(dataset: str, base_dir: str = None) -> dict:
-#     with open(dataset_config_path(dataset, base_dir=base_dir), "r") as f:
-#         return yaml.safe_load(f)
+def dataset_config(dataset: str, base_dir: str = None) -> dict:
+    cfg_path = dataset_config_path(dataset, base_dir=base_dir)
+    with open(cfg_path, "r") as f:
+        return yaml.safe_load(f)
 #====================================================================
 def open_zarr(dataset_name, filename):
     rank = dist.get_rank() if dist.is_available() and dist.is_initialized() else 0

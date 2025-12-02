@@ -42,10 +42,21 @@ def main(config_path, checkpoint_path=None):
 
     data_path = Path(config.data.dataset_path)
     config = lightning_utils.configure_location_args(config, data_path)
-    data_scaler = lightning_utils.build_or_load_data_scaler(config)
-    training_dataloader, eval_dataloader = lightning_utils.build_dataloaders(
-        config, data_scaler.transform, num_workers=16
-    )
+    use_josh_pipeline = getattr(config.data, "use_josh_pipeline", False)
+
+    if use_josh_pipeline:
+        datamodule = lightning_utils.build_josh_datamodule(config, num_workers=16)
+        datamodule.setup("fit")
+        training_dataloader, eval_dataloader = (
+            datamodule.train_dataloader(),
+            datamodule.val_dataloader(),
+        )
+    else:
+        datamodule = None
+        data_scaler = lightning_utils.build_or_load_data_scaler(config)
+        training_dataloader, eval_dataloader = lightning_utils.build_dataloaders(
+            config, data_scaler.transform, num_workers=16
+        )
 
     model = lightning_utils.build_model(config)
 
@@ -54,7 +65,8 @@ def main(config_path, checkpoint_path=None):
     project_name = config.project_name
     output_dir = base_output_dir / project_name / run_name
     output_dir.mkdir(exist_ok=True, parents=True)
-    data_scaler.save_scaler_parameters(output_dir / 'scaler_parameters.pkl')
+    if not use_josh_pipeline:
+        data_scaler.save_scaler_parameters(output_dir / 'scaler_parameters.pkl')
 
     checkpoint_base_path = f"{str(output_dir)}/chkpts"
     callback_config = {
@@ -76,7 +88,10 @@ def main(config_path, checkpoint_path=None):
         wandb_logger,
     )
 
-    trainer.fit(model, training_dataloader, eval_dataloader, ckpt_path=checkpoint_path)
+    if datamodule is not None:
+        trainer.fit(model, datamodule=datamodule, ckpt_path=checkpoint_path)
+    else:
+        trainer.fit(model, training_dataloader, eval_dataloader, ckpt_path=checkpoint_path)
     wandb.finish()
 
 

@@ -1,4 +1,3 @@
-
 from pathlib import Path
 import torch
 import xarray as xr
@@ -12,6 +11,7 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 from ..data.scaling import DataScaler
 from ..data.data_loading import get_dataloader, prepare_and_scale_data
 from ..data.constants import TRAINING_COORDS_LOOKUP
+from ..data_Josh.data_module import LightningDataModule as JoshDataModule
 
 from .ema import EMA
 
@@ -29,10 +29,16 @@ _MODELS_DICT = {
 }
 
 
+def _get_output_variables(config):
+    if hasattr(config.data, "predictands"):
+        return list(config.data.predictands.variables)
+    return config.data.variables[1]
+
+
 def build_model(config, checkpoint_name=None):
     model_type = config.model_type
     model_class = _MODELS_DICT[model_type]
-    output_variables = config.data.variables[1]
+    output_variables = _get_output_variables(config)
     model_kwargs = {
         "output_channels": output_variables,
         "weights": config.training.loss_weights,
@@ -219,6 +225,11 @@ def create_indices(full_indices_config):
 
 def build_dataloaders(config, transform, num_workers):
 
+    if getattr(config.data, "use_josh_pipeline", False):
+        datamodule = build_josh_datamodule(config, num_workers=num_workers)
+        datamodule.setup("fit")
+        return datamodule.train_dataloader(), datamodule.val_dataloader()
+
     dl_configs = [
         (config.data.train_indices, True, False),
         (config.data.eval_indices, False, True),
@@ -282,3 +293,24 @@ def build_dataloader(
         **dloader_kwargs
     )
     return dataloader
+
+
+def build_josh_datamodule(config, num_workers=0):
+    data_cfg = config.data
+    return JoshDataModule(
+        config=config,
+        active_dataset_name=data_cfg.dataset,
+        model_src_dataset_name=getattr(data_cfg, "dataset_name", data_cfg.dataset),
+        input_transform_dataset_name=getattr(
+            data_cfg, "input_transform_dataset", getattr(data_cfg, "dataset_name", data_cfg.dataset)
+        ),
+        transform_dir=getattr(data_cfg, "transform_dir", None),
+        batch_size=config.training.batch_size,
+        filename=getattr(data_cfg, "filename", getattr(data_cfg, "train_filename", None)),
+        val_filename=getattr(data_cfg, "val_filename", None),
+        include_time_inputs=getattr(data_cfg, "time_inputs", False),
+        evaluation=False,
+        shuffle=True,
+        num_workers=num_workers,
+        prefetch_factor=getattr(data_cfg, "prefetch_factor", None),
+    )
