@@ -328,6 +328,24 @@ class Sampler:
         :return: Dict, rescaled outputs.
         """
         scaled_outputs = {}
+        target_transforms = self._get_target_transforms()
+        if target_transforms:
+            for var_idx, variable in enumerate(self.output_variables):
+                transform = target_transforms.get(variable)
+                if transform is None:
+                    if hasattr(self.data_scaler, "variable_scaler_map") and (
+                        variable in self.data_scaler.variable_scaler_map
+                    ):
+                        scaled_outputs[variable] = self.data_scaler.variable_scaler_map[
+                            variable
+                        ].inverse_transform(preds[:, var_idx])
+                    else:
+                        scaled_outputs[variable] = preds[:, var_idx]
+                else:
+                    scaled_outputs[variable] = self._invert_with_transform(
+                        transform, variable, preds[:, var_idx]
+                    )
+            return scaled_outputs
         for var_idx, variable in enumerate(self.output_variables):
             scaled_outputs[variable] = self.data_scaler.variable_scaler_map[
                 variable
@@ -343,3 +361,50 @@ class Sampler:
     def save_config(self, config, output_path):
         with open(output_path / "sampling_config.json", "w", encoding="utf-8") as file:
             json.dump(config, file, indent=4)
+
+    def _get_target_transforms(self):
+        """Extract target transforms from the evaluation dataloader if available."""
+        collate_fn = getattr(self.eval_dl, "collate_fn", None)
+        if collate_fn is None:
+            return None
+        target_transforms = getattr(collate_fn, "target_transforms", None)
+        if isinstance(target_transforms, dict) and len(target_transforms) > 0:
+            return target_transforms
+        return None
+
+    def _invert_with_transform(self, transform, variable, arr: np.ndarray) -> np.ndarray:
+        """Safely apply a transform's invert method to a prediction slice."""
+        if transform is None:
+            return arr
+
+        candidates = [arr]
+        if arr.ndim == 3:
+            candidates.append(arr[:, None, ...])
+
+        for candidate in candidates:
+            try:
+                if hasattr(transform, "invert") and callable(transform.invert):
+                    inverted = transform.invert(candidate)
+                elif hasattr(transform, "inverse_transform") and callable(
+                    transform.inverse_transform
+                ):
+                    inverted = transform.inverse_transform(candidate)
+                else:
+                    continue
+            except Exception:
+                continue
+
+            if isinstance(inverted, dict):
+                if variable in inverted:
+                    inverted = inverted[variable]
+                elif len(inverted) > 0:
+                    inverted = next(iter(inverted.values()))
+
+            inverted = (
+                inverted.cpu().numpy() if hasattr(inverted, "cpu") else np.asarray(inverted)
+            )
+            if inverted.ndim == 4 and inverted.shape[1] == 1:
+                inverted = np.squeeze(inverted, axis=1)
+            return inverted.astype(np.float32)
+
+        return arr
