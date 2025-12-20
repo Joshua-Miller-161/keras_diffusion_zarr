@@ -12,18 +12,39 @@ from tqdm.contrib.logging import logging_redirect_tqdm
 from tqdm import tqdm
 import torch
 from torch import nn
-import shortuuid
 import numpy as np
 import xarray as xr
 from pathlib import Path
 from functools import reduce
 import json
+import os
 
 from typing import List, Tuple, Callable, Dict
 
 from ..lightning import utils as lightning_utils
 from ..data.scaling import DataScaler
 from ..data.data_loading import  select_custom_coordinates
+
+
+def make_predictions_filename(directory, config, prefix="predictions"):
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+
+    schedule_config = config[0] if isinstance(config, tuple) and len(config) > 0 else {}
+    n_steps = schedule_config.get("n", "unknown") if isinstance(schedule_config, dict) else "unknown"
+
+    existing_files = list(directory.glob(f"{prefix}_n={n_steps}_sample*.nc"))
+    next_index = len(existing_files)
+
+    print(
+        " >> >> INSIDE make_predictions_filename next_index,",
+        next_index,
+        ", ",
+        len(list(directory.glob("*.nc"))),
+    )
+
+    new_filename = f"{prefix}_n={n_steps}_sample{next_index}.nc"
+    return os.path.join(directory, new_filename)
 
 
 def diffusion_sampling(
@@ -207,7 +228,9 @@ class Sampler:
                 coords, config, sampling_args, output_variables=output_variables
             )
 
-            output_filepath = output_dirpath / f"predictions-{shortuuid.uuid()}.nc"
+            output_filepath = Path(
+                make_predictions_filename(output_dirpath, config, prefix="predictions")
+            )
 
             print(f"Saving samples to {output_filepath}...")
             xr_samples.to_netcdf(output_filepath)
