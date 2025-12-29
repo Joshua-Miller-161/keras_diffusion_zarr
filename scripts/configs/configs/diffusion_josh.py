@@ -1,5 +1,6 @@
 import ml_collections
 
+from ..paths import WORK_DIR
 from .defaults import get_default_configs
 
 
@@ -20,7 +21,7 @@ def get_config():
     data.dataset = "MY_ACTIVE_ZARR"
     data.dataset_name = "MY_MODEL_SRC"
     data.input_transform_dataset = "MY_TRANSFORM_REF"
-    data.transform_dir = "./transforms"
+    data.transform_dir = f"{WORK_DIR}/transforms"
     data.filename = "train.zarr"
     data.val_filename = "val.zarr"
     data.time_inputs = False

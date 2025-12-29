@@ -19,6 +19,7 @@ from lightning.pytorch.loggers import WandbLogger
 import wandb
 import torch
 import torch._dynamo
+from configs.paths import WORK_DIR
 
 torch._dynamo.config.suppress_errors = True
 torch.set_float32_matmul_precision("medium")
@@ -68,7 +69,9 @@ def main(config_path, checkpoint_path=None):
     if not use_josh_pipeline:
         data_scaler.save_scaler_parameters(output_dir / 'scaler_parameters.pkl')
 
-    checkpoint_base_path = f"{str(output_dir)}/chkpts"
+    checkpoint_dir = Path(WORK_DIR) / "transforms"
+    checkpoint_dir.mkdir(exist_ok=True, parents=True)
+    checkpoint_base_path = str(checkpoint_dir)
     callback_config = {
         "checkpoint_dir": checkpoint_base_path,
         "lr_monitor": "step",
