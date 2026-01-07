@@ -14,8 +14,12 @@ from torch.optim.lr_scheduler import (
 import pytorch_lightning as pl
 import numpy as np
 import logging
+import torch.distributed as dist
 
 logger = logging.getLogger(__name__)
+
+def is_main_process():
+    return not dist.is_available() or not dist.is_initialized() or dist.get_rank() == 0
 
 class LightningBase(pl.LightningModule):
     """
@@ -93,7 +97,8 @@ class LightningBase(pl.LightningModule):
         bs = self.get_batchsize(batch)
         _, loss = self.shared_step(batch)
         
-        logger.info(f" >> >> INSIDE base training_step | loss {loss['loss'].detach().cpu().numpy()}")
+        if is_main_process():
+            logger.info(f" >> >> INSIDE base training_step | loss {loss['loss'].detach().cpu().numpy()}")
         self._log_loss(loss, batch_size=bs)
 
         return loss["loss"]
@@ -103,8 +108,9 @@ class LightningBase(pl.LightningModule):
         bs = self.get_batchsize(batch)
         _, loss = self.shared_step(batch, "val_")
         self.model.train()
-
-        logger.info(f" >> >> INSIDE base training_step | val_loss {loss['val_loss'].detach().cpu().numpy()}")
+        
+        if is_main_process():
+            logger.info(f" >> >> INSIDE base validation_step | val_loss {loss['val_loss'].detach().cpu().numpy()}")
         self._log_loss(loss, "val_", batch_size=bs)
 
         return loss["val_loss"]
