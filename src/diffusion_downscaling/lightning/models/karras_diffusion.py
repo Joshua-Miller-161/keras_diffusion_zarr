@@ -19,7 +19,7 @@ class AbstractKarrasDenoiser(nn.Module):
     def __init__(self, inner_model, device="cpu"):
         super().__init__()
         self.inner_model = inner_model
-        self.ignore = torch.Tensor([1.0]).to(device)
+        self.register_buffer("ignore", torch.tensor([1.0], device=device))
 
         self.trim_output_fields = lambda x: x
         self.sigma_converter = lambda x: x
@@ -111,14 +111,14 @@ class EDMDenoiser(AbstractKarrasDenoiser):
     def __init__(self, inner_model, sigma_data=1.0, weighting="karras", device="cpu"):
         super().__init__(inner_model, device)
         self.inner_model = inner_model
-        self.sigma_data = torch.Tensor([sigma_data]).to(device)
+        self.register_buffer("sigma_data", torch.tensor([sigma_data], device=device))
         self.get_scalings = self.get_edm_scalings
-        self.P_std = torch.Tensor([0.8]).to(device)
-        self.P_mean = torch.Tensor([-1.6]).to(device)
-        self.ignore = torch.Tensor([1.0]).to(device)
+        self.register_buffer("P_std", torch.tensor([0.8], device=device))
+        self.register_buffer("P_mean", torch.tensor([-1.6], device=device))
+        self.register_buffer("ignore", torch.tensor([1.0], device=device))
 
-        self.log_uniform_u = torch.log(torch.Tensor([80.1])).to(device)
-        self.log_uniform_l = torch.log(torch.Tensor([0.02])).to(device)
+        self.register_buffer("log_uniform_u", torch.log(torch.tensor([80.1], device=device)))
+        self.register_buffer("log_uniform_l", torch.log(torch.tensor([0.02], device=device)))
 
         if callable(weighting):
             self.weighting = weighting
