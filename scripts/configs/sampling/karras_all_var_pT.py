@@ -8,8 +8,7 @@ def get_sampling_config():
     # config.output_format = "n_20_churn_10_snoise_1.005_rho_3.5_fixed"
     config.output_format = "n_{n}_churn_{s_churn}_snoise_{s_noise}_smin{s_tmin}_rho_{rho}"
     config.eval_indices = {
-        "split": [0.9, 1],
-        "date_range": ("2012-01-01", "2013-12-31"),
+        "split": [0, 1],
     }
 
     # config.eval_indices = {
@@ -22,8 +21,9 @@ def get_sampling_config():
     config.eval = ml_collections.ConfigDict()
     eval = config.eval
     eval.eval_output_dir = "diff"
+    config.eval_dataset = "/gang/gang/j_miller/data/zarr/val_consolidated_time1_elev.zarr"
 
-    eval.checkpoint_name = "epoch=236-val_loss=0.0698.ckpt" # diffusion_
+    eval.checkpoint_name = "/gang/gang/j_miller/temp/checkpoints/zarr/josh_zarr_example/epoch=4-val_loss=0.0204.ckpt" # diffusion_
 
     eval.n_samples = 5
     # eval.location_config = 'colorado'
