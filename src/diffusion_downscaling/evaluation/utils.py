@@ -12,6 +12,16 @@ from .plotting import EvaluationPlotter
 from .metrics import Metrics
 from .consts import HIST_LIMITS
 
+
+def _open_dataset(path: Path):
+    path = Path(path)
+    if path.suffix == ".zarr" or path.is_dir():
+        try:
+            return xr.open_zarr(path, consolidated=True)
+        except (KeyError, ValueError, OSError):
+            return xr.open_zarr(path)
+    return xr.open_dataset(path)
+
 def remove_leap_days(dates_list):
 
     dates_pd = pd.to_datetime(dates_list)
@@ -123,7 +133,7 @@ def run_variable_evaluation(
 def prepare_eval_data(data_path, eval_data_split, coords=None):
     """Load in evaluation data given a data path, the data split and coordinates.
     """
-    xarray_original = xr.open_dataset(data_path)
+    xarray_original = _open_dataset(data_path)
     indices = slice(
         *(np.array(eval_data_split["split"]) * len(xarray_original.time)).astype(int)
     )

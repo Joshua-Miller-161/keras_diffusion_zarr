@@ -26,6 +26,16 @@ from ..data.scaling import DataScaler
 from ..data.data_loading import  select_custom_coordinates
 
 
+def _open_dataset(path: Path):
+    path = Path(path)
+    if path.suffix == ".zarr" or path.is_dir():
+        try:
+            return xr.open_zarr(path, consolidated=True)
+        except (KeyError, ValueError, OSError):
+            return xr.open_zarr(path)
+    return xr.open_dataset(path)
+
+
 def make_predictions_filename(directory, config, prefix="predictions"):
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
@@ -158,7 +168,7 @@ class Sampler:
         """
         self.precision = self.precision_lookup[main_config.precision]
 
-        xr_data = xr.open_dataset(main_config.data.dataset_path)
+        xr_data = _open_dataset(main_config.data.dataset_path)
         buffer_width = main_config.training.loss_buffer_width
 
         sampling_args, all_configs = eval_args
