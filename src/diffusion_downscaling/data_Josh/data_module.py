@@ -195,6 +195,7 @@ class LightningDataModule(pl.LightningDataModule):
         )
 
         self.dl_kwargs['shuffle'] = False
+        self.dl_kwargs['drop_last'] = False
         
         data_loader = DataLoader(xr_dataset, **self.dl_kwargs)
         
@@ -211,6 +212,7 @@ class LightningDataModule(pl.LightningDataModule):
 
         self.dl_kwargs['num_workers'] = 0
         self.dl_kwargs['shuffle'] = False
+        self.dl_kwargs['drop_last'] = False
 
         data_loader = DataLoader(xr_dataset, **self.dl_kwargs)
         
