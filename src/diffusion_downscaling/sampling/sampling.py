@@ -297,10 +297,33 @@ class Sampler:
     def get_dims(self, coords):
         """Extract lat lon and time dimensions from the evaluation dataset.
         """
-        times = self.eval_dl.dataset.ds.time.values
+        dataset = self.eval_dl.dataset
+        if hasattr(dataset, "ds"):
+            times = dataset.ds.time.values
+            if coords is None:
+                lat = dataset.ds.lat
+                lon = dataset.ds.lon
+            else:
+                lat, lon = coords
+            return times, lat, lon
+
+        if hasattr(dataset, "_ensure_open"):
+            dataset._ensure_open()
+
+        times = getattr(dataset, "time_values", None)
+        if times is None:
+            raise AttributeError(
+                "Evaluation dataset does not expose time values. "
+                "Expected a .ds.time array or a time_values attribute."
+            )
         if coords is None:
-            lat = self.eval_dl.dataset.ds.lat
-            lon = self.eval_dl.dataset.ds.lon
+            lat = getattr(dataset, "lat_values", None)
+            lon = getattr(dataset, "lon_values", None)
+            if lat is None or lon is None:
+                raise AttributeError(
+                    "Evaluation dataset does not expose lat/lon values. "
+                    "Expected .ds.lat/.ds.lon or lat_values/lon_values attributes."
+                )
         else:
             lat, lon = coords
         return times,lat,lon

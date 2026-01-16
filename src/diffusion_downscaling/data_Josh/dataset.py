@@ -23,6 +23,9 @@ class DownscalingDataset(Dataset):
 
         # worker-local objects (created lazily)
         self.opened = False
+        self.time_values = None
+        self.lat_values = None
+        self.lon_values = None
 
     def _ensure_open(self):
         if self.opened:
@@ -39,6 +42,14 @@ class DownscalingDataset(Dataset):
             self.time_values = decode_zarr_time_array(self.z, time_key="time")
         else:
             self.time_values = None
+        if "lat" in self.z.array_keys():
+            self.lat_values = np.asarray(self.z["lat"][:])
+        else:
+            self.lat_values = None
+        if "lon" in self.z.array_keys():
+            self.lon_values = np.asarray(self.z["lon"][:])
+        else:
+            self.lon_values = None
 
         self.opened = True
 
