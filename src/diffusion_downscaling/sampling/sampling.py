@@ -26,6 +26,16 @@ from ..data.scaling import DataScaler
 from ..data.data_loading import  select_custom_coordinates
 
 
+def _open_dataset(path: Path):
+    path = Path(path)
+    if path.suffix == ".zarr" or path.is_dir():
+        try:
+            return xr.open_zarr(path, consolidated=True)
+        except (KeyError, ValueError, OSError):
+            return xr.open_zarr(path)
+    return xr.open_dataset(path)
+
+
 def make_predictions_filename(directory, config, prefix="predictions"):
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
@@ -158,7 +168,7 @@ class Sampler:
         """
         self.precision = self.precision_lookup[main_config.precision]
 
-        xr_data = xr.open_dataset(main_config.data.dataset_path)
+        xr_data = _open_dataset(main_config.data.dataset_path)
         buffer_width = main_config.training.loss_buffer_width
 
         sampling_args, all_configs = eval_args
@@ -287,13 +297,27 @@ class Sampler:
     def get_dims(self, coords):
         """Extract lat lon and time dimensions from the evaluation dataset.
         """
-        times = self.eval_dl.dataset.ds.time.values
+        dataset = self.eval_dl.dataset
+        if hasattr(dataset, "ds"):
+            times = dataset.ds.time.values
+            if coords is None:
+                lat = dataset.ds.lat
+                lon = dataset.ds.lon
+            else:
+                lat, lon = coords
+            return times, lat, lon
+
+        times = getattr(dataset, "time_values", None)
         if coords is None:
-            lat = self.eval_dl.dataset.ds.lat
-            lon = self.eval_dl.dataset.ds.lon
-        else:
-            lat, lon = coords
-        return times,lat,lon
+            data_path = Path(getattr(dataset, "file_path", ""))
+            if not data_path:
+                raise AttributeError("Evaluation dataset has no accessible path for coordinates.")
+            ds = _open_dataset(data_path)
+            times = times if times is not None else ds.time.values
+            lat = ds.lat
+            lon = ds.lon
+            return times, lat, lon
+        return times, coords[0], coords[1]
 
     def build_rescaled_ds(self, dims, stacked_preds):
         """Rescale predictions before packing them in an xarray.
@@ -346,6 +370,11 @@ class Sampler:
                         transform, variable, preds[:, var_idx]
                     )
             return scaled_outputs
+        if not getattr(self.data_scaler, "variable_scaler_map", {}):
+            return {
+                variable: preds[:, var_idx]
+                for var_idx, variable in enumerate(self.output_variables)
+            }
         for var_idx, variable in enumerate(self.output_variables):
             scaled_outputs[variable] = self.data_scaler.variable_scaler_map[
                 variable

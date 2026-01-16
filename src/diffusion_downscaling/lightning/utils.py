@@ -148,7 +148,14 @@ def configure_location_args(config, data_path):
     if config.model.location_parameters is None:
         config.model.location_parameter_config = None
         return config
-    ds = xr.open_dataset(data_path)
+    data_path = Path(data_path)
+    if data_path.suffix == ".zarr" or data_path.is_dir():
+        try:
+            ds = xr.open_zarr(data_path, consolidated=True)
+        except (KeyError, ValueError, OSError):
+            ds = xr.open_zarr(data_path)
+    else:
+        ds = xr.open_dataset(data_path)
     coords = ds.lat.values, ds.lon.values
     config.model.location_parameter_config = coords, config.model.location_parameters
     return config

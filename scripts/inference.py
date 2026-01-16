@@ -20,6 +20,7 @@ torch.set_float32_matmul_precision("medium")
 sys.path.append(os.getcwd())
 
 from src.diffusion_downscaling.lightning.utils import configure_location_args, build_or_load_data_scaler, build_model, setup_custom_training_coords
+from src.diffusion_downscaling.data.scaling import DataScaler
 #import diffusion_downscaling.lightning.utils as lightning_utils
 
 from ..src.diffusion_downscaling.sampling.sampling import Sampler
@@ -60,28 +61,42 @@ def run_eval(config, sampling_config, predictions_only):
     config.data.eval_indices = sampling_config.eval_indices
     output_variables = config.data.variables[1]
 
-    data_path = Path(config.data.dataset_path)
-    config = configure_location_args(config, data_path)
+    data_path = Path(config.data.dataset_path) if config.data.dataset_path else None
     location_config = dict(sampling_config.eval).get("location_config")
+    if not hasattr(config.model, "location_parameter_config"):
+        config.model.location_parameter_config = None
 
     base_output_dir = Path(config.base_output_dir)
     run_name = config.run_name
     project_name = config.project_name
     output_dir = base_output_dir / project_name / run_name
+    custom_dset = dict(sampling_config).get("eval_dataset")
+    if custom_dset is not None:
+        data_path = Path(custom_dset)
+        config.data.dataset_path = str(data_path)
+        config.data.filename = str(data_path)
+        config.data.val_filename = str(data_path)
+
+    if data_path is None:
+        data_path = Path(config.data.dataset_path)
+    config = configure_location_args(config, data_path)
     data_scaler_path = sampling_config.get('data_scaler_path') or output_dir / 'scaler_parameters.pkl'
-    data_scaler = build_or_load_data_scaler(config, data_scaler_path)
+    if data_scaler_path is not None and Path(data_scaler_path).is_file():
+        data_scaler = build_or_load_data_scaler(config, data_scaler_path)
+    else:
+        variable_scaler_map = getattr(config.data, "variable_scaler_map", {}) or {}
+        if variable_scaler_map:
+            data_scaler = build_or_load_data_scaler(config, None)
+        else:
+            data_scaler = DataScaler({})
 
     eval_config = sampling_config.eval
     checkpoint_name = eval_config.checkpoint_name
     model = build_model(config, checkpoint_name)
 
     config.training.batch_size = sampling_config.batch_size
-    custom_dset = dict(sampling_config).get("eval_dataset")
     config = setup_custom_training_coords(config, sampling_config)
 
-    if custom_dset is not None:
-        data_path = custom_dset
-        config.data.dataset_path = data_path
     if predictions_only:
         variables = (config.data.variables[0], [])
         data_scaler.set_transform_exclusion(config.data.variables[1])
