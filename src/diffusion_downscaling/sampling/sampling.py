@@ -237,6 +237,7 @@ class Sampler:
         """
         for sample_id in range(num_samples):
             print(f"Sample run {sample_id}...")
+            logger.info(f" >> >> INSIDE sampling.generate_predictions | sampling {sample_id}")
             xr_samples = self.run_sampling(
                 coords, config, sampling_args, output_variables=output_variables
             )
@@ -246,7 +247,7 @@ class Sampler:
             )
 
             print(f"Saving samples to {output_filepath}...")
-            logger.info(f" >> >> inside sampling.generate_predictions | output_filepath {output_filepath}")
+            logger.info(f" >> >> INSIDE sampling.generate_predictions | output_filepath {output_filepath}")
             xr_samples.to_netcdf(output_filepath)
 
     def run_sampling(self, coords, *args, **kwargs):

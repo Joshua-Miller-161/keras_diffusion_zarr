@@ -47,7 +47,7 @@ def parse_module(path):
     return path.replace(".py", "").replace("/", ".")
 
 
-def run_eval(config, sampling_config, predictions_only):
+def run_eval(config, sampling_config, predictions_only=True):
     """Run evaluation over all sampling configurations give configs.
 
     This is a high level function that runs evaluation over all sampling configurations;
@@ -82,7 +82,10 @@ def run_eval(config, sampling_config, predictions_only):
     base_output_dir = config_['WORK_DIR']
     run_name = config.run_name
     project_name = config.project_name
-    output_dir = os.path.join(config_['WORK_DIR'], 'samples', DATASET FROM TRAINING CONFIG) #
+    output_dir = os.path.join(config_['WORK_DIR'], 'samples', config.data.dataset_name, sampling_config.eval_dataset.rsplit('/', 1)[-1].split('.', 1)[0])
+
+    print(f" >> >> INSIDE inference | output_dir {output_dir}")
+    logger.info(f" >> >> INSIDE inference | output_dir {output_dir}")
     #-----------------------------------------------------------------
 
     custom_dset = dict(sampling_config).get("eval_dataset")
@@ -125,7 +128,9 @@ def run_eval(config, sampling_config, predictions_only):
         output_variables,
         sampling_config.output_format,
     )
-    base_output = output_dir / eval_config.eval_output_dir
+    
+    base_output = output_dir
+    #base_output = output_dir / eval_config.eval_output_dir
 
     logger.info(f" >> >> INSIDE inference | base_output: {base_output}")
     print(f" >> >> INSIDE inference | base_output: {base_output}")
@@ -154,7 +159,7 @@ def run_eval(config, sampling_config, predictions_only):
     )
 
 
-def main(config_path, sampling_config_path, predictions_only):
+def main(config_path, sampling_config_path, predictions_only=True):
 
     # Import config dynamically using provided config path
     config_module = importlib.import_module(parse_module(config_path))

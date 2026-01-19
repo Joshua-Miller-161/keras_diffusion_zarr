@@ -2,7 +2,6 @@ import ml_collections
 
 from .defaults import get_default_configs
 
-
 def get_config():
     config = get_default_configs()
 
