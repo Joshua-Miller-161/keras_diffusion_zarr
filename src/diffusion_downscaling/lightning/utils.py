@@ -6,6 +6,8 @@ import torch
 import xarray as xr
 import numpy as np
 import pytorch_lightning as pl
+import yaml
+from typing import Any
 from dotenv import load_dotenv, dotenv_values, find_dotenv
 
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint, TQDMProgressBar
@@ -103,6 +105,41 @@ def build_model(config, checkpoint_name=None):
 def convert_precision(precision_string):
     conversion = {"32": "32", "bf16": "bf16-mixed", "16": "16-mixed"}
     return conversion[precision_string]
+
+
+def _to_primitive(obj: Any) -> Any:
+    if hasattr(obj, "items"):
+        return {k: _to_primitive(v) for k, v in obj.items()}
+
+    if isinstance(obj, (list, tuple)):
+        return [_to_primitive(v) for v in obj]
+
+    if isinstance(obj, torch.device):
+        return obj.type
+
+    if isinstance(obj, np.generic):
+        try:
+            return obj.item()
+        except Exception:
+            return str(obj)
+    if isinstance(obj, np.ndarray):
+        try:
+            return obj.tolist()
+        except Exception:
+            return str(obj)
+
+    if isinstance(obj, (str, int, float, bool, type(None))):
+        return obj
+
+    return str(obj)
+
+
+def save_training_config(config, checkpoint_dir: str) -> str:
+    config_path = os.path.join(checkpoint_dir, "training_config.yml")
+    config_dict = _to_primitive(config)
+    with open(config_path, "w", encoding="utf-8") as file:
+        yaml.safe_dump(config_dict, file, sort_keys=False)
+    return config_path
 
 
 def build_or_load_data_scaler(config, data_scaler_parameters_path = None):
@@ -208,6 +245,7 @@ def get_callbacks(callback_args):
             every_n_epochs=1,
             save_top_k=10,
             monitor="val_loss",
+            save_last=True,
         )
     )
     save_n_epochs = args.get('save_n_epochs')

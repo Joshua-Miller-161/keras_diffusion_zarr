@@ -17,7 +17,7 @@ import logging
 from dotenv import load_dotenv, dotenv_values, find_dotenv
 
 sys.path.append(os.path.dirname(os.getcwd()))
-from src.diffusion_downscaling.lightning.utils import build_trainer, configure_location_args, build_josh_datamodule, build_or_load_data_scaler, build_dataloaders, build_model, LossOnlyProgressBar
+from src.diffusion_downscaling.lightning.utils import build_trainer, configure_location_args, build_josh_datamodule, build_or_load_data_scaler, build_dataloaders, build_model, LossOnlyProgressBar, save_training_config
 
 from pytorch_lightning.loggers import WandbLogger, TensorBoardLogger
 from pytorch_lightning import Trainer
@@ -112,6 +112,8 @@ def main(config_path, checkpoint_path=None):
     checkpoint_base_path = os.path.join(config_['WORK_DIR'], "checkpoints", config.data.dataset, config.run_name)
     logger.info(f" >> INSIDE train | checkpoint_base_path {checkpoint_base_path}")
     os.makedirs(checkpoint_base_path, exist_ok=True)
+    saved_config_path = save_training_config(config, checkpoint_base_path)
+    logger.info(" >> INSIDE train | saved training config to %s", saved_config_path)
     #----------------------------------------------------------------
     # Callbacks
 
