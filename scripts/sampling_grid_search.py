@@ -23,14 +23,14 @@ from tqdm import tqdm
 
 from src.diffusion_downscaling.data.scaling import DataScaler
 from src.diffusion_downscaling.lightning import utils as lightning_utils
-from src.diffusion_downscaling.lightning.utils import build_model, setup_custom_training_coords
-from src.diffusion_downscaling.sampling.sampling import Sampler
-from src.diffusion_downscaling.sampling.utils import (
-    build_sampling_callable_and_config,
-    build_schedule,
-    combine_configs_and_product_lists,
-    dictfilt,
+from src.diffusion_downscaling.lightning.utils import (
+    build_model,
+    build_or_load_data_scaler,
+    configure_location_args,
+    setup_custom_training_coords,
 )
+from src.diffusion_downscaling.sampling.sampling import Sampler
+from src.diffusion_downscaling.sampling.utils import create_sampling_configurations
 from src.diffusion_downscaling.data.data_loading import select_custom_coordinates
 from src.diffusion_downscaling.evaluation.utils import (
     _open_dataset,
@@ -246,10 +246,7 @@ def run_grid_search(config, sampling_config):
     config.data.eval_indices = sampling_config.eval_indices
     output_variables = config.data.variables[1]
 
-    use_josh_pipeline = True
-    config.data.use_josh_pipeline = True
-    logger.info("Forcing Josh pipeline for sampling grid search.")
-    print(" >> Forcing Josh pipeline for sampling grid search.")
+    use_josh_pipeline = getattr(config.data, "use_josh_pipeline", False)
 
     data_path = Path(config.data.dataset_path) if config.data.dataset_path else None
     location_config = dict(sampling_config.eval).get("location_config")
@@ -275,9 +272,14 @@ def run_grid_search(config, sampling_config):
         checkpoint_epoch,
     )
 
-    if data_path is None:
-        data_path = Path(config.data.dataset_path)
-    data_scaler = DataScaler({})
+    if use_josh_pipeline:
+        data_scaler = DataScaler({})
+    else:
+        if data_path is None:
+            data_path = Path(config.data.dataset_path)
+        config = configure_location_args(config, data_path)
+        data_scaler_path = sampling_config.get("data_scaler_path") or Path(output_dir) / "scaler_parameters.pkl"
+        data_scaler = build_or_load_data_scaler(config, data_scaler_path)
 
     eval_config = sampling_config.eval
     checkpoint_name = eval_config.checkpoint_name
@@ -299,31 +301,8 @@ def run_grid_search(config, sampling_config):
 
     num_samples = eval_config.n_samples
 
-    grid_search_config = dict(sampling_config.sampling.grid_search)
-    grid_search_config["device"] = str(config.device)
-    s_churn_grid = grid_search_config.pop("s_churn")
-    s_noise_grid = grid_search_config.pop("s_noise")
-
-    schedule_callable, schedule_config = build_schedule(grid_search_config)
-    sampling_callable, sampling_config_dict = build_sampling_callable_and_config(
-        sampling_config.sampling.sampler
-    )
-    sampling_config_dict["s_churn"] = s_churn_grid
-    sampling_config_dict["s_noise"] = s_noise_grid
-
-    location_config_dict = {"location_config": location_config}
-    sweep_args_list = combine_configs_and_product_lists(
-        schedule_config, sampling_config_dict, location_config_dict
-    )
-    split_sweep_args = [
-        (
-            dictfilt(args_dict, schedule_config),
-            dictfilt(args_dict, sampling_config_dict),
-            dictfilt(args_dict, location_config_dict),
-        )
-        for args_dict in sweep_args_list
-    ]
-    eval_args = (schedule_callable, sampling_callable), split_sweep_args
+    sampling_config.sampling.schedule.device = str(config.device)
+    eval_args = create_sampling_configurations(sampling_config.sampling, location_config)
 
     xr_data = _open_dataset(config.data.dataset_path)
     buffer_width = config.training.loss_buffer_width
