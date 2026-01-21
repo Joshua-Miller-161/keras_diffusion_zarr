@@ -34,14 +34,16 @@ def get_sampling_config():
     sampling.sampler = ml_collections.ConfigDict()
     sampler = sampling.sampler
     sampler.integrator = "dpm2_heun"
-    sampler.s_churn = [6, 8, 10, 12, 14]
-    sampler.s_noise = [0.985, 0.995, 1.005, 1.015, 1.025]
+    sampler.s_churn = 10
+    sampler.s_noise = 1.005
     sampler.s_tmin = 0.04
     sampler.s_tmax = 50
 
     sampling.grid_search = ml_collections.ConfigDict()
     grid_search = sampling.grid_search
     grid_search.type = "karras"
+    grid_search.s_churn = [6, 8, 10, 12, 14]
+    grid_search.s_noise = [0.985, 0.995, 1.005, 1.015, 1.025]
     grid_search.n = [12, 16, 20, 24, 28]
     grid_search.rho = [3, 5, 7, 9, 11]
     grid_search.sigma_min = 0.02
