@@ -39,12 +39,17 @@ def get_sampling_config():
     sampler.s_tmin = 0.04
     sampler.s_tmax = 50
 
-    sampling.schedule = ml_collections.ConfigDict()
-    schedule = sampling.schedule
-    schedule.type = "karras"
-    schedule.n = 20
-    schedule.rho = 7
-    schedule.sigma_min = 0.02
-    schedule.sigma_max = 80
+    sampling.grid_search = ml_collections.ConfigDict()
+    grid_search = sampling.grid_search
+    grid_search.type = "karras"
+    grid_search.s_churn = [6, 8, 10, 12, 14]
+    grid_search.s_noise = [0.985, 0.995, 1.005, 1.015, 1.025]
+    grid_search.n = [12, 16, 20, 24, 28]
+    grid_search.rho = [3, 5, 7, 9, 11]
+    grid_search.sigma_min = 0.02
+    grid_search.sigma_max = 80
+
+    # Alias for compatibility with existing sampling utilities.
+    sampling.schedule = grid_search
 
     return config
